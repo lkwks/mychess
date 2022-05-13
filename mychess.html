@@ -1,0 +1,52 @@
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>my chess</title>
+<style>
+
+body { background-color:black;}
+
+#board { width:480px; height:480px; display:flex; flex-wrap:wrap;}
+#promote_box { width:480px; height:100px; display:flex;  align-items:center; justify-content:center;}
+
+.cell { width:60px; height:60px; display:flex; align-items:center;}
+
+.cell_black { background-color:#ddd;}
+.cell_white { background-color:white;}
+
+.piece { width:40px; height:40px; margin:auto; }
+
+.path { background-color:#ddffdd;}
+.attacked { background-color:#ffdddd;}
+
+.button_box{width:480px; height:100px; display:flex; align-items:center; justify-content:center;}
+
+
+.WP { background-image:url(./pieces.png); background-position:-227px -2px;}
+.WR { background-image:url(./pieces.png); background-position:-182px -2px;}
+.WN { background-image:url(./pieces.png); background-position:-137px -2px;}
+.WB { background-image:url(./pieces.png); background-position:-92px -2px;}
+.WQ { background-image:url(./pieces.png); background-position:-47px -2px;}
+.WK { background-image:url(./pieces.png); background-position:-3px -2px;}
+
+.BP { background-image:url(./pieces.png); background-position:-227px 42px;}
+.BR { background-image:url(./pieces.png); background-position:-182px 42px;}
+.BN { background-image:url(./pieces.png); background-position:-137px 42px;}
+.BB { background-image:url(./pieces.png); background-position:-92px 42px;}
+.BQ { background-image:url(./pieces.png); background-position:-47px 42px;}
+.BK { background-image:url(./pieces.png); background-position:-3px 42px;}
+
+
+</style>
+</head>
+<body>
+<div id="board">
+</div>
+<div class="button_box">
+<button id="new_game">new game</button>
+</div>
+<div id="promote_box">
+</div>
+<script src="./mychess.js"></script>
+</body>
+</html>
