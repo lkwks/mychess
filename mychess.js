@@ -4,11 +4,20 @@ const piece_moven = {"R":-1, "N":1, "B":-1, "Q":-1, "K":1, "P":1};
 const board_initial_piece = ["RNBQKBNR", "PPPPPPPP", "........", "........", "........", "........","PPPPPPPP","RNBQKBNR"];
 const promote_piece = "QRBN";
 
-
+function is_in(arr, pos)
+{
+    var answer = false;
+    arr.forEach( elem =>
+    {
+        if (elem[0] == pos[0] && elem[1] == pos[1]) answer = true;
+    });
+    return answer;
+}
 
 class Piece {
-    constructor(piece_name, piece_pos)
+    constructor(board, piece_name, piece_pos)
     {
+        this.board = board;
         this.name = piece_name;
         this.pos = piece_pos;
         this.move_times = 0;
@@ -16,6 +25,7 @@ class Piece {
         this.dom_elem = document.createElement("div");
         this.dom_elem.classList.add("piece", this.team+this.name);
         this.is_promoted = -1;
+        this.is_enpassant = -1;
     }
     
     possible_pos() //현재 기물이 움직일 수 있는 경로를 모두 뽑아 리턴
@@ -27,8 +37,9 @@ class Piece {
             c = col + elem[1];
             loop_n = 0;
         
-            while((r <= 7 && r >= 0 && c <= 7 && c >= 0) && (piece_moven[this.name] == -1 || loop_n < piece_moven[this.name] || (loop_n == 1 && this.name == "P" && row == (this.team == 'W'?1:6))) && ( board.board[r][c] == false || board.board[r][c].team != this.team))
+            while((r <= 7 && r >= 0 && c <= 7 && c >= 0) && (piece_moven[this.name] == -1 || loop_n < piece_moven[this.name] || (loop_n == 1 && this.name == "P" && row == (this.team == 'W'?1:6))) && ( this.board.board[r][c] == false || this.board.board[r][c].team != this.team))
             {
+                if (this.name == "P" && this.board.board[r][c]) break;
                 if (this.name == "K") //왕은 '움직이면 체크인 곳'으로는 못 감.
                 {
                     var not_available = false;
@@ -36,23 +47,20 @@ class Piece {
                         for (var j=0; j<8; j++)
                             if (board.board[i][j] && board.board[i][j].team != this.team)
                             {
-                                if (board.board[i][j].name != "K" && board.board[i][j].possible_pos().includes([r, c])) not_available = true;
-                                if (board.board[i][j].name == "K" && Math.abs(i-r) == 1 && Math.abs(c-j) == 1) not_available = true;                             
+                                if (this.board.board[i][j].name != "K" && is_in(this.board.board[i][j].possible_pos(), [r, c])) not_available = true;
+                                if (this.board.board[i][j].name == "K" && Math.abs(i-r) == 1 && Math.abs(c-j) == 1) not_available = true;                             
                             }
                     if (not_available == false)
                         arr.push([r, c]);
                 }
-                else if (board.checked)
+                else if (this.board.checked && this.board.checked.team == this.board.now_clicked.team)
                 {
-                    if (board.cell_dom_elems[r][c].classList.contains("moved") && board.board[r][c]) //체크 상태고 지금 클릭한 게 왕이 아니라면 '체크한 말'을 죽이는 선택만 가능
+                    if (this.check_if_this_piece_can_avoid_check([r, c])) //체크 상태고 지금 클릭한 게 왕이 아니라면 '체크한 말'을 죽이거나 경로를 막는 선택만 가능
                         arr.push([r, c]);
                 }
                 else 
-                {
-                    if (this.name == "P" && board.board[r][c]) break;
                     arr.push([r, c]);
-                }
-                if (board.board[r][c]) break;
+                if (this.board.board[r][c]) break;
                 r += elem[0] * (this.team == 'W'?1:-1);
                 c += elem[1];
                 loop_n++;
@@ -66,19 +74,19 @@ class Piece {
                 c = col + elem[1];
                 if (r <= 7 && r >= 0 && c <= 7 && c >= 0)
                 {
-                    if (board.board[r][c] && board.board[r][c].team != this.team) //폰의 공격
+                    if (this.board.board[r][c] && this.board.board[r][c].team != this.team && (!this.board.checked || (this.board.checked && this.board.checked.team == this.board.now_clicked.team && this.check_if_this_piece_can_avoid_check([r, c])))) //폰의 공격
                         arr.push([r, c]);
-                    if (board.board[row][c] && board.board[row][c].name == "P" && board.board[row][c].team != this.team && board.board[row][c].moved_times == 1) //앙파상
+                    if (this.board.board[row][c] && this.board.board[row][c].name == "P" && this.board.board[row][c].team != this.team && this.board.board[row][c].is_enpassant >= 0) //앙파상
                         arr.push([r, c]);
                 }
             });
 
 
-        if (this.name == 'K' && this.move_times == 0) //캐슬링
+        if (this.name == "K" && this.board.now_clicked.name == 'K' && this.move_times == 0 && this.board.checked == false && this.team == this.board.now_clicked.team) //캐슬링
         {
-            if (board.board[row][0] && board.board[row][0].name == "R" && board.board[row][0].move_times == 0 && (board.board[row][1] || board.board[row][2] || board.board[row][3])==false)
+            if (this.board.board[row][0] && this.board.board[row][0].name == "R" && this.board.board[row][0].move_times == 0 && (this.board.board[row][1] || this.board.board[row][2] || this.board.board[row][3])==false && this.check_if_you_can_castle([row, 2]))
                 arr.push([row, 2]);
-            if (board.board[row][7] && board.board[row][7].name == "R" && board.board[row][7].move_times == 0 && (board.board[row][6] || board.board[row][5])==false)
+            if (this.board.board[row][7] && this.board.board[row][7].name == "R" && this.board.board[row][7].move_times == 0 && (this.board.board[row][6] || this.board.board[row][5])==false && this.check_if_you_can_castle([row, 6]))
                 arr.push([row, 6]);
         }
     
@@ -88,22 +96,55 @@ class Piece {
     
     change_pos(pos)
     {   
-        var killed_piece = board.board[pos[0]][pos[1]];
+        var killed_piece = this.board.board[pos[0]][pos[1]];
         
-        board.board[this.pos[0]][this.pos[1]] = false;
+        this.board.board[this.pos[0]][this.pos[1]] = false;
         this.pos = pos;
-        board.board[pos[0]][pos[1]] = this;
+        this.board.board[pos[0]][pos[1]] = this;
         
-        while (board.cell_dom_elems[pos[0]][pos[1]].firstChild)
-            board.cell_dom_elems[pos[0]][pos[1]].removeChild(board.cell_dom_elems[pos[0]][pos[1]].firstChild);
-        board.cell_dom_elems[pos[0]][pos[1]].appendChild(this.dom_elem);
+        while (this.board.cell_dom_elems[pos[0]][pos[1]].firstChild)
+            this.board.cell_dom_elems[pos[0]][pos[1]].removeChild(this.board.cell_dom_elems[pos[0]][pos[1]].firstChild);
+        this.board.cell_dom_elems[pos[0]][pos[1]].appendChild(this.dom_elem);
         
-        if ("KR".includes(this.name))
+        if ("KRP".includes(this.name))
             this.move_times++;
         
         return killed_piece;
     }
-    
+
+    check_if_this_piece_can_avoid_check(pos)
+    {
+        //this를 pos로 옮기면 체크를 피할 수 있는지 확인하는 메서드
+        
+        var king = this.board.checked, avoid_succeed=true, temp = this.board.board[pos[0]][pos[1]];
+        this.board.checked = false;
+        
+        this.board.board[pos[0]][pos[1]] = this;
+        
+        for (var i=0; i<8; i++)
+            for (var j=0; j<8; j++)
+                if (this.board.board[i][j] && this.board.board[i][j].team != this.team && is_in(this.board.board[i][j].possible_pos(), king.pos))
+                    avoid_succeed = false;
+
+        console.log(avoid_succeed);
+        this.board.board[pos[0]][pos[1]] = temp;
+        this.board.checked = king;
+        return avoid_succeed;
+    }
+
+    check_if_you_can_castle(pos)
+    {
+        var avoid_check = true;
+        for (var i=0; i<8; i++)
+            for (var j=0; j<8; j++)
+                if (this.board.board[i][j] && this.board.board[i][j].team != this.team)
+                {
+                    var possible_pos = this.board.board[i][j].possible_pos();
+                    if (is_in(possible_pos, pos) || is_in(possible_pos, [pos[0], pos[1] == 2 ? 3: 5])) //[i, j]가 킹의 이동경로를 공격한다면 캐슬 불가.
+                        avoid_check = false;
+                }
+        return avoid_check;
+    }
 
 }
 
@@ -120,15 +161,7 @@ class Board {
         this.now_clicked = null;
 
 
-        this.promo_box = document.getElementById("promote_box");
-        for (var i=0; i<promote_piece.length; i++)
-        {            
-            const promo_piece_wrapper = document.createElement("div");
-            promo_piece_wrapper.classList.add('cell', 'cell_white');
-            promo_piece_wrapper.id = promote_piece[i];
-            this.promo_box.appendChild(promo_piece_wrapper);
-        }
-        this.promo_box.style = 'display:none';
+        this.promo_box = new PromoteBox(this);
         
         for (var i=0; i<8; i++)
         {
@@ -149,6 +182,7 @@ class Board {
     
     new_game()
     {
+        this.pgn_n = 0; this.now_clicked = null; this.checked = false;
         const s = (Math.random() * 2 >= 1) ? [0, 7] : [7, 0];
 
         while(document.getElementById("board").childNodes.length > 0)
@@ -166,11 +200,8 @@ class Board {
 
                 if (board_initial_piece[i][j] != '.')
                 {
-                    this.board[i][j] = new Piece(board_initial_piece[i][j], [i, j]);
+                    this.board[i][j] = new Piece(this, board_initial_piece[i][j], [i, j]);
                     this.cell_dom_elems[i][j].appendChild(this.board[i][j].dom_elem);
-                    
-                    if (this.board[i][j].team == 'W')
-                        this.board[i][j].dom_elem.addEventListener("click", click);
                 }
                 else
                     this.board[i][j] = false;
@@ -182,6 +213,8 @@ class Board {
             if (i == s[1]) break;
             i += (s[1] - s[0] > 0) ? 1 : -1;
         }
+        
+        this.clear_clicked_state(false, true);
     }  
     
     
@@ -201,42 +234,46 @@ class Board {
                         this.board[i][j].dom_elem.addEventListener("click", click);
                 }
             }
+        this.promo_box.close_window();
     }
 
     check_if_there_is_check_and_mates()
     {
-        var is_check = false, king_pos = [], changed_pos = this.pgn[this.pgn_n-1][1], now_moved_piece = this.board[changed_pos[0]][changed_pos[1]];
+        if (this.pgn_n ==0 ) 
+        {
+            this.clear_clicked_state(false, true);
+            return;
+        }
+        this.checked = false;
+        var king_pos = [], changed_pos = this.pgn[this.pgn_n-1][1], now_moved_piece = this.board[changed_pos[0]][changed_pos[1]];
         
         now_moved_piece.possible_pos().forEach(elem => {
             if (this.board[elem[0]][elem[1]] && this.board[elem[0]][elem[1]].team != now_moved_piece.team && this.board[elem[0]][elem[1]].name == "K")
             {
-                is_check = true;
+                this.checked = this.board[elem[0]][elem[1]];
                 king_pos = elem;
             }
         });
     
-        var is_checkmate = false, is_stalemate = !is_check;
+        var is_checkmate = this.checked, is_stalemate = !this.checked;
         for (var i=0; i<8; i++)
             for (var j=0; j<8; j++)
             {
                 if (this.board[i][j] == false || this.board[i][j].team == now_moved_piece.team) continue;
-                if (is_check)
+                if (is_checkmate)
                 {
-                    if (this.board[i][j].name == 'K')
-                    {
-                        if (this.board[i][j].possible_pos().length == 0)
-                            is_checkmate = true;
-                    }
+                    if (this.board[i][j].possible_pos().length > 0) //다른 기물로 체크 상태 피할 수 있으면 메이트 아님. 
+                        is_checkmate = false;
                 }
-                else if (is_stalemate)
+                else
                 {
                     if (this.board[i][j].possible_pos().length > 0)
                         is_stalemate = false;                
                 }
             }
-                
+
         this.clear_clicked_state(is_checkmate || is_stalemate, true);
-        if (is_check)
+        if (this.checked)
             this.cell_dom_elems[king_pos[0]][king_pos[1]].classList.add("checked");
         
         var before_pos = this.pgn[this.pgn_n-1][0];
@@ -244,24 +281,10 @@ class Board {
         this.cell_dom_elems[changed_pos[0]][changed_pos[1]].classList.add("moved");
     }
 
-    open_promote_box(piece)
-    {
-        this.promo_box.style = 'display:flex';
-        this.promo_box.childNodes.forEach( elem => {
-            if (elem.id != undefined)
-            {
-                var promo_piece = document.createElement("div");
-                promo_piece.classList.add("piece", piece.team+elem.id);
-                promo_piece.addEventListener("click", promote);
-                elem.appendChild(promo_piece);
-            }
-        });
-    }
-    
     
     previous()
     {
-        now_moved_piece = this.board[this.pgn[this.pgn_n-1][1][0]][this.pgn[this.pgn_n-1][1][1]];
+        var now_moved_piece = this.board[this.pgn[this.pgn_n-1][1][0]][this.pgn[this.pgn_n-1][1][1]];
         if (this.pgn_n == now_moved_piece.is_promoted)
         {
             now_moved_piece.dom_elem.classList.remove(now_moved_piece.team + now_moved_piece.name);
@@ -279,23 +302,76 @@ class Board {
 
         
         now_moved_piece.change_pos(this.pgn[this.pgn_n-1][0]);
-        this.board[this.pgn[this.pgn_n-1][1][0]][this.pgn[this.pgn_n-1][1][1]] = this.pgn[this.pgn_n-1][2];
+        this.board[this.pgn[this.pgn_n-1][1][0]][this.pgn[this.pgn_n-1][1][1]] = false;
         if (this.pgn[this.pgn_n-1][2]) 
+        {
+            this.board[this.pgn[this.pgn_n-1][2].pos[0]][this.pgn[this.pgn_n-1][2].pos[1]] = this.pgn[this.pgn_n-1][2];
             this.cell_dom_elems[this.pgn[this.pgn_n-1][2].pos[0]][this.pgn[this.pgn_n-1][2].pos[1]].appendChild(this.pgn[this.pgn_n-1][2].dom_elem);
-        
+        }
+            
+        if (this.pgn[this.pgn_n-1][2].is_enpassant == this.pgn_n-1)
+            this.pgn[this.pgn_n-1][2].is_enpassant = -1;
         
         this.pgn_n--;
         if (this.pgn_n == 0) document.getElementById("previous").disabled = 'disabled';
         //if (document.getElementById("next").disabled) document.getElementById("next").disabled = '';
-        this.clear_clicked_state(false, true);
+        this.check_if_there_is_check_and_mates();
     }
     
     
     next()
     {
     }
+        
+}
+
+
+class PromoteBox {
+    constructor(board)
+    {
+        this.board = board;
+        this.dom_elem = document.getElementById("promote_box");
+        for (var i=0; i<promote_piece.length; i++)
+        {            
+            const promo_piece_wrapper = document.createElement("div");
+            promo_piece_wrapper.classList.add('cell', 'cell_white');
+            promo_piece_wrapper.id = promote_piece[i];
+            this.dom_elem.appendChild(promo_piece_wrapper);
+        }
+        this.dom_elem.style = 'display:none';
+    }
     
+    close_window()
+    {
+        this.dom_elem.childNodes.forEach( elem => {
+            while(elem.firstChild)
+                elem.removeChild(elem.firstChild);
+        });
+        this.dom_elem.style = 'display:none';
+
+    }
+
+    open_window(piece)
+    {
+        this.dom_elem.style = 'display:flex';
+        this.dom_elem.childNodes.forEach( elem => {
+            if (elem.id != undefined)
+            {
+                var promo_piece = document.createElement("div");
+                promo_piece.classList.add("piece", piece.team+elem.id);
+                promo_piece.addEventListener("click", promote);
+                elem.appendChild(promo_piece);
+            }
+        });
+
+        for (var i=0; i<8; i++)
+            for (var j=0; j<8; j++)
+                if (this.board.board[i][j])
+                    this.board.board[i][j].dom_elem.removeEventListener("click", click);
+
+    }
     
+
 }
 
 
@@ -309,16 +385,35 @@ document.getElementById("new_game").addEventListener("click", e=>board.new_game(
         col = e.target.parentNode.id.charCodeAt(0) - 65;
         row = e.target.parentNode.id.charCodeAt(1) - 49;
         if (board.cell_dom_elems[row][col].classList.contains("clicked"))
+        {
             board.clear_clicked_state(false, false);
+            board.cell_dom_elems[board.pgn[board.pgn_n-1][0][0]][board.pgn[board.pgn_n-1][0][1]].classList.add("moved");
+            board.cell_dom_elems[board.pgn[board.pgn_n-1][1][0]][board.pgn[board.pgn_n-1][1][1]].classList.add("moved");
+            if (board.checked)
+                board.cell_dom_elems[board.checked.pos[0]][board.checked.pos[1]].classList.add("checked");
+        }
         else
         {
             board.clear_clicked_state(false, false);
+            if (board.pgn_n >= 1)
+            {
+                board.cell_dom_elems[board.pgn[board.pgn_n-1][0][0]][board.pgn[board.pgn_n-1][0][1]].classList.add("moved");
+                board.cell_dom_elems[board.pgn[board.pgn_n-1][1][0]][board.pgn[board.pgn_n-1][1][1]].classList.add("moved");
+            }
+            if (board.checked)
+                board.cell_dom_elems[board.checked.pos[0]][board.checked.pos[1]].classList.add("checked");
             board.now_clicked = board.board[row][col];
             board.cell_dom_elems[row][col].classList.add("clicked");
-            board.board[row][col].possible_pos().forEach( elem => {
+            board.now_clicked.possible_pos().forEach( elem => {
+                board.cell_dom_elems[elem[0]][elem[1]].classList.remove("moved");
                 if (board.board[elem[0]][elem[1]] == false)
-                    board.cell_dom_elems[elem[0]][elem[1]].classList.add("path");
-                else if (board.board[elem[0]][elem[1]].team != board.board[row][col].team)
+                {
+                    if (board.now_clicked.name == "P" && elem[1] != col)
+                        board.cell_dom_elems[elem[0]][elem[1]].classList.add("attacked");
+                    else
+                        board.cell_dom_elems[elem[0]][elem[1]].classList.add("path");
+                }
+                else if (board.board[elem[0]][elem[1]].team != board.now_clicked.team)
                     board.cell_dom_elems[elem[0]][elem[1]].classList.add("attacked");
                 board.cell_dom_elems[elem[0]][elem[1]].addEventListener("click", move_to);
             });
@@ -345,16 +440,20 @@ document.getElementById("new_game").addEventListener("click", e=>board.new_game(
         killed_piece = board.now_clicked.change_pos([row2, col2]);
 
 
-        if (board.now_clicked.name == "P" && col1 != col2 && board.board[row2][col2] == false) //앙파상
+        if (board.now_clicked.name == "P")
         {
-            board.cell_dom_elems[row1][col2].removeChild(board.cell_dom_elems[row1][col2].firstChild);
-            killed_piece = board.board[row1][col2];
-            board.board[row1][col2] = false;
+            if (Math.abs(row2-row1) == 2 && ((col2 >= 1 && board.board[row2][col2-1] && board.board[row2][col2-1].name=="P") ||(col2 <= 6 && board.board[row2][col2+1] && board.board[row2][col2+1].name=="P")))
+                board.now_clicked.is_enpassant = board.pgn_n;
+            
+            if (col1 != col2 && killed_piece == false) //앙파상
+            {
+                board.cell_dom_elems[row1][col2].removeChild(board.cell_dom_elems[row1][col2].firstChild);
+                killed_piece = board.board[row1][col2];
+                board.board[row1][col2] = false;
+            }
         }
 
 
-        if (board.now_clicked.name == "P" && row2 == (board.now_clicked.team == "W"?7 : 0))
-            board.open_promote_box(board.now_clicked);
     
         if (board.pgn.length > board.pgn_n)
         {
@@ -363,6 +462,8 @@ document.getElementById("new_game").addEventListener("click", e=>board.new_game(
         }
         board.pgn.push([[row1, col1], board.now_clicked.pos, killed_piece]); board.pgn_n++;
         board.check_if_there_is_check_and_mates();
+        if (board.now_clicked.name == "P" && row2 == (board.now_clicked.team == "W"?7 : 0))
+            board.promo_box.open_window(board.now_clicked);
         
         if (document.getElementById("previous").disabled) document.getElementById("previous").disabled = '';
         //document.getElementById("next").disabled = 'disabled';
@@ -370,13 +471,13 @@ document.getElementById("new_game").addEventListener("click", e=>board.new_game(
     }
     function promote(e)
     {
-        promote_piece = board.board[board.now_clicked.pos[0]][board.now_clicked.pos[1]];
-        promote_piece.name = e.target.parentNode.id;
-        promote_piece.is_promoted = board.pgn_n;
-        promote_piece.dom_elem.classList.remove(promote_piece.team + "P");
-        promote_piece.dom_elem.classList.add(promote_piece.team + promote_piece.name);
+        piece = board.board[board.now_clicked.pos[0]][board.now_clicked.pos[1]];
+        piece.name = e.target.parentNode.id;
+        piece.is_promoted = board.pgn_n;
+        piece.dom_elem.classList.remove(piece.team + "P");
+        piece.dom_elem.classList.add(piece.team + piece.name);
         board.cell_dom_elems[board.now_clicked.pos[0]][board.now_clicked.pos[1]].removeChild(board.now_clicked.dom_elem);
         board.cell_dom_elems[board.now_clicked.pos[0]][board.now_clicked.pos[1]].appendChild(board.board[board.now_clicked.pos[0]][board.now_clicked.pos[1]].dom_elem);
-        board.promo_box.style = 'display:none';
+        board.promo_box.close_window();
         board.check_if_there_is_check_and_mates();
     }
