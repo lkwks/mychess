@@ -35,7 +35,7 @@ class Piece {
 	
 	(1) W팀 기물 클릭
 	1. W팀 기물을 클릭하면 그 기물이 움직일 수 있는 경로를 뽑기 위해 possible_pos()가 실행된다.
-	2. possible_pos() 안에서는 그 기물이 움직일 수 있는 경로로 움직였을 때 B팀에 의해 우리 왕이 공격받지는 않는지 확인하기 위해 각 좌표마다 check_if_this_piece_can_avoid_check()가 실행된다.
+	2. possible_pos() 안에서는 그 기물이 움직일 수 있는 경로로 움직였을 때 B팀에 의해 우리 왕이 공격받지는 않는지 확인하기 위해 그 기물이 움직일 수 있는 각 좌표마다 check_if_this_piece_can_avoid_check()가 실행된다.
 	3. check_if_this_piece_can_avoid_check()에서는 B팀의 각 기물이 W팀 왕을 공격할 수 있는지 확인하기 위해 각 기물마다 possible_pos()가 실행된다. 단, 이때 실행되는 possible_pos()는 this.team과 this.board.now_clicked.tema이 다르기 때문에 다시 check_if_this_piece_can_avoid_check()가 실행되지는 않는다. (무한루프 방지)
 	
 	(2) W팀 기물을 이동 경로로 이동시킴
@@ -43,6 +43,13 @@ class Piece {
 	2. check_if_there_is_check_and_mates()에서는...
 	- 체크인지 확인하기 위해 막 이동한 W팀 말이 이동할 수 있는 모든 경로를 체크한다. 이때 실행되는 possible_pos()는 this.team과 this.board.now_clicked.team이 같은데, 그럼에도 불구하고 그 말이 공격을 했을 때 W팀 왕이 공격당하는지 여부를 확인하는 check_if_this_piece_can_avoid_check()는 실행되어선 안된다 ㅡㅡ
 	- W팀 기물 이동 완료 후 움직일 수 있는 B팀 기물이 있는지(스테일메이트가 아닌지) 확인하기 위해 B팀 기물에 대해 possible_pos()가 실행된다. 단 이때 실행되는 possible_pos()는 this.team과 this.board.now_clicked.team이 다르기 때문에 여기서 추가로 check_if_this_piece_can_avoid_check()가 실행되지는 않는다. (무한루프 방지)
+
+
+	1. B팀 기물을 클릭하면 그 기물이 움직일 수 있는 경로를 뽑기 위해 possible_pos()가 실행된다. 
+	2. possible_pos() 안에서는 그 기물이 움직일 수 있는 경로로 움직였을 때 W팀에 의해 우리 왕이 공격받지는 않는지 확인하기 위해 그 기물이 움직일 수 있는 각 좌표마다 check_if_this_piece_can_avoid_check()가 실행된다.(폰을 누르면 2번 실행.)
+	3. check_if_this_piece_can_avoid_check()에서는 W팀의 각 기물이 B팀 왕을 공격할 수 있는지 확인하기 위해 각 기물마다 possible_pos()가 실행된다. 단, 이때 실행되는 possible_pos()는 this.team(=W팀)과 this.board.now_clicked.team(=B팀)이 다르기 때문에 다시 check_if_this_piece_can_avoid_check()가 실행되지는 않는다. (무한루프 방지)
+    - 만약 무한루프가 발생했다면 여기서 뭔가 잘못된 거. 
+
 	
 	*/
 	
@@ -51,7 +58,6 @@ class Piece {
     {
         var arr = [], col = this.pos[1], row = this.pos[0], moving_piece, r, c, loop_n;
     
-		console.log(this.team, this.board.now_clicked.team);
 	
         piece_dir[this.name].forEach( elem => {
             r = row + elem[0] * (this.team == 'W'?1:-1);
@@ -61,14 +67,20 @@ class Piece {
             while((r <= 7 && r >= 0 && c <= 7 && c >= 0) && (piece_moven[this.name] == -1 || loop_n < piece_moven[this.name] || (loop_n == 1 && this.name == "P" && row == (this.team == 'W'?1:6))) && ( this.board.board[r][c] == false || this.board.board[r][c].team != this.team))
             {
                 if (this.name == "P" && this.board.board[r][c]) break;
-                if (this.name == "K") //왕은 '움직이면 체크인 곳'으로는 못 감.
+                if (this.name == "K" && this.team == this.board.now_clicked.team) //왕은 '움직이면 체크인 곳'으로는 못 감.
                 {
                     var not_available = false;
                     for (var i=0; i<8; i++)
                         for (var j=0; j<8; j++)
-                            if (board.board[i][j] && board.board[i][j].team != this.team)
+                            if (this.board.board[i][j] && this.board.board[i][j].team != this.team && not_available == false)
                             {
-                                if (this.board.board[i][j].name != "K" && is_in(this.board.board[i][j].possible_pos(), [r, c])) not_available = true;
+                                if (this.board.board[i][j].name != "K")
+                                {
+                                    var temp = this.board.board[r][c];
+                                    this.board.board[r][c] = this;
+                                    if(is_in(this.board.board[i][j].possible_pos(), [r, c])) not_available = true;
+                                    this.board.board[r][c] = temp;
+                                }
                                 if (this.board.board[i][j].name == "K" && Math.abs(i-r) == 1 && Math.abs(c-j) == 1) not_available = true;                             
                             }
                     if (not_available == false)
@@ -147,17 +159,19 @@ class Piece {
     check_if_this_piece_can_avoid_check(pos)
     {
         //this를 pos로 옮기면 체크를 피할 수 있는지, 또는 pos로 옮겨서 this.team의 왕이 체크 상태가 되는건 아닌지 확인하는 메서드
-        
         var avoid_succeed=true, temp = this.board.board[pos[0]][pos[1]];
         this.board.board[pos[0]][pos[1]] = this;
+        this.board.board[this.pos[0]][this.pos[1]] = false;
 		
-		console.log(this);
         
         for (var i=0; i<8; i++)
             for (var j=0; j<8; j++)
+            {
                 if (this.board.board[i][j] && this.board.board[i][j].team != this.team && avoid_succeed && is_in(this.board.board[i][j].possible_pos(), this.board.king[this.team].pos)) //현재 [i, j] 위치에 있는 상대편 기물이 혹시나 this.team의 왕을 공격하지 않는지?
                     avoid_succeed = false;
+            }
 
+        this.board.board[this.pos[0]][this.pos[1]] = this;
         this.board.board[pos[0]][pos[1]] = temp;
         return avoid_succeed;
     }
@@ -246,8 +260,7 @@ class Board {
             if (i == s[1]) break;
             i += (s[1] - s[0] > 0) ? 1 : -1;
         }
-        
-        this.clear_clicked_state(false, true);
+        this.clear_clicked_state(false, true)
     }  
     
     
@@ -270,14 +283,16 @@ class Board {
         this.promo_box.close_window();
     }
 
-    check_if_there_is_check_and_mates()
+    check_if_there_is_check_and_mates(sw)
     {
-        if (this.pgn_n ==0 ) 
+        this.checked = false;
+        
+        if (this.pgn_n == 0)
         {
             this.clear_clicked_state(false, true);
             return;
         }
-        this.checked = false;
+        
         var king_pos = [], changed_pos = this.pgn[this.pgn_n-1][1], now_moved_piece = this.board[changed_pos[0]][changed_pos[1]];
         
         now_moved_piece.possible_pos().forEach(elem => {
@@ -344,11 +359,11 @@ class Board {
             
         if (this.pgn[this.pgn_n-1][2].is_enpassant == this.pgn_n-1)
             this.pgn[this.pgn_n-1][2].is_enpassant = -1;
-        
         this.pgn_n--;
+        
         if (this.pgn_n == 0) document.getElementById("previous").disabled = 'disabled';
         //if (document.getElementById("next").disabled) document.getElementById("next").disabled = '';
-        this.check_if_there_is_check_and_mates();
+        this.check_if_there_is_check_and_mates(false);
     }
     
     
@@ -494,8 +509,8 @@ document.getElementById("new_game").addEventListener("click", e=>board.new_game(
             board.pgn_n = board.pgn.length;
         }
         board.pgn.push([[row1, col1], board.now_clicked.pos, killed_piece]); 
-        board.check_if_there_is_check_and_mates();
 		board.pgn_n++;
+        board.check_if_there_is_check_and_mates(true);
         if (board.now_clicked.name == "P" && row2 == (board.now_clicked.team == "W"?7 : 0))
             board.promo_box.open_window(board.now_clicked);
         
@@ -513,5 +528,5 @@ document.getElementById("new_game").addEventListener("click", e=>board.new_game(
         board.cell_dom_elems[board.now_clicked.pos[0]][board.now_clicked.pos[1]].removeChild(board.now_clicked.dom_elem);
         board.cell_dom_elems[board.now_clicked.pos[0]][board.now_clicked.pos[1]].appendChild(board.board[board.now_clicked.pos[0]][board.now_clicked.pos[1]].dom_elem);
         board.promo_box.close_window();
-        board.check_if_there_is_check_and_mates();
+        board.check_if_there_is_check_and_mates(true);
     }
