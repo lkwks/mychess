@@ -338,13 +338,20 @@ class Board {
             now_moved_piece.name = "P";
             now_moved_piece.dom_elem.classList.add(now_moved_piece.team + "P");
         }
+        now_moved_piece.move_times--;
 
         if (now_moved_piece.name == "K" && Math.abs(now_moved_piece.pos[1] - this.pgn[this.pgn_n-1][0][1]) >= 2)
         {
             if (Math.abs(now_moved_piece.pos[1] - this.pgn[this.pgn_n-1][0][1]) == 2)
+            {
+                this.board[now_moved_piece.pos[0]][3].move_times--;
                 this.board[now_moved_piece.pos[0]][3].change_pos([now_moved_piece.pos[0], 0]);
+            }
             else
+            {
+                this.board[now_moved_piece.pos[0]][5].move_times--;
                 this.board[now_moved_piece.pos[0]][5].change_pos([now_moved_piece.pos[0], 7]);
+            }
         }
 
         
