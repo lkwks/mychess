@@ -295,13 +295,12 @@ class Board {
         
         var king_pos = [], changed_pos = this.pgn[this.pgn_n-1][1], now_moved_piece = this.board[changed_pos[0]][changed_pos[1]];
         
-        now_moved_piece.possible_pos().forEach(elem => {
-            if (this.board[elem[0]][elem[1]] && this.board[elem[0]][elem[1]].team != now_moved_piece.team && this.board[elem[0]][elem[1]].name == "K")
-            {
-                this.checked = this.board[elem[0]][elem[1]];
-                king_pos = elem;
-            }
-        });
+        
+        
+        for (var i=0; i<8; i++)
+            for (var j=0; j<8; j++)
+                if (this.board[i][j] && this.board[i][j].team == this.board[changed_pos[0]][changed_pos[1]].team && this.checked == false && is_in(this.board[i][j].possible_pos(), this.king[this.board[i][j].team=='W'?'B':'W'].pos))
+                    this.checked = this.king[this.board[i][j].team=='W'?'B':'W'];
     
         var is_checkmate = this.checked, is_stalemate = !this.checked;
         for (var i=0; i<8; i++)
@@ -322,7 +321,7 @@ class Board {
 
         this.clear_clicked_state(is_checkmate || is_stalemate, true);
         if (this.checked)
-            this.cell_dom_elems[king_pos[0]][king_pos[1]].classList.add("checked");
+            this.cell_dom_elems[this.checked.pos[0]][this.checked.pos[1]].classList.add("checked");
         
         var before_pos = this.pgn[this.pgn_n-1][0];
         this.cell_dom_elems[before_pos[0]][before_pos[1]].classList.add("moved");
