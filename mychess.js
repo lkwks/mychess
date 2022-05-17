@@ -77,9 +77,11 @@ class Piece {
                                 if (this.board.board[i][j].name != "K")
                                 {
                                     var temp = this.board.board[r][c];
+                                    this.board.board[row][col] = false;
                                     this.board.board[r][c] = this;
                                     if(is_in(this.board.board[i][j].possible_pos(), [r, c])) not_available = true;
                                     this.board.board[r][c] = temp;
+                                    this.board.board[row][col] = this;
                                 }
                                 if (this.board.board[i][j].name == "K" && Math.abs(i-r) == 1 && Math.abs(c-j) == 1) not_available = true;                             
                             }
